@@ -12,7 +12,9 @@ z = audioread('VocalSound2.wav'); % Sound for spectral envelope modulator
 % phaseTransfer  - transfers the phase of the modulator into y
 % whitening      - Whitens the source sound
 % spectralFreeze - 1 or 0 Takes an average of the spectral envelope
+% spectralDelay  - 1 or 0 Employs a spectral delay for the spectral
+% envelope
 
-[out] = spectralVocoder2(x, y, z, Fs, 'Rectangular', 0, 0, 0, 0);
+[out] = spectralVocoder2(x, y, z, Fs, 'Rectangular', 0, 0, 1, 0, 1);
 
 audiowrite('CrossCepstrum.wav', out, Fs);

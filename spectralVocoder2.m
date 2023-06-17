@@ -8,9 +8,10 @@
 % phaseTransfer  - 1 or 0 transfers the phase of the modulator into y
 % whitening      - 1 or 0 Whitens the source sound
 % spectralFreeze - 1 or 0 Takes an average of the spectral envelope
+% spectralDelay  - 1 or 0 Employs a spectral delay for the spectral
+% envelope
 
-
-function [out] = spectralVocoder2(x, y, z, Fs, lifteringType, morphingOn, phaseTransfer, whitening, spectralFreeze)
+function [out] = spectralVocoder2(x, y, z, Fs, lifteringType, morphingOn, phaseTransfer, whitening, spectralFreeze, spectralDelay)
 
 % Get sampling period
 Ts = 1/Fs;
@@ -54,14 +55,39 @@ DAFx_out = zeros(L,1);
 % Set spectral freeze size
 freeze_frames = 25;
 
-% circular buffer to store spectral envelope frames
-buffer = zeros(s_win,freeze_frames);
+% Set variables for spectral freeze
+walk_index = 0;
+walk_direction = 1;
+walk_index_mod = 0;
+walk_direction_mod = 1;
 
 % Index for counting number of frames 
-hop_count = 0;
+hop_count = 1;
 
 % For freeze effect 
-prev_envelope = zeros(1024,1);
+freeze_buffer = zeros(1024,freeze_frames);
+freeze_buffer_mod = zeros(1024,freeze_frames);
+
+% Create delay vector for spectral delay
+max_delay = 200;
+s_delay_vector = round(linspace(0, max_delay, s_win));
+
+% Create buffers for spectral delay
+delay_buffer = zeros(s_win,max_delay);
+delay_buffer_mod = zeros(s_win,max_delay);
+
+% Set morphing mode if selected
+if morphing ~= 0
+
+    mode = input('Select morphing mode, 1 for frequency morphing or 2 for magnitude morphing');
+    if mode == 1
+        morphingMode = 1;
+    elseif mode == 2
+        morphingMode = 2;
+    else
+        error('INVALID INPUT');
+    end
+end
 
 % Cross synthesis
 while pin<pend
@@ -109,13 +135,33 @@ while pin<pend
     
     % Inverse FFT to get the spectral envelope of y
     flog_cut_env = 2*real(fft(cep_cut));
-    f_env_out_y = exp(flog_cut_env);
     % Inverse FFT to get the spectral envelope of z
     flog_cut_mod = 2*real(fft(cep_cut_mod));
+
+    if spectralDelay
+        delay_buffer = circularBufferWrite(flog_cut_env,delay_buffer,hop_count);
+        flog_cut_env = processSpectralDelay(flog_cut_env,delay_buffer,hop_count,s_delay_vector);
+        delay_buffer_mod = circularBufferWrite(flog_cut_mod,delay_buffer_mod,hop_count);
+        flog_cut_mod = processSpectralDelay(flog_cut_mod,delay_buffer_mod,hop_count,s_delay_vector);
+    end
+
+    % Add spectral envelopes to buffer if freeze is on and not past number
+    % of freeze frames
+    if spectralFreeze
+        freeze_buffer = handle_freeze_storage(flog_cut_env,freeze_frames, hop_count, freeze_buffer);
+        [flog_cut_env,walk_index,walk_direction] = handle_freeze_walk(flog_cut_env,freeze_frames,hop_count,walk_index,walk_direction,freeze_buffer);
+        freeze_buffer_mod = handle_freeze_storage(flog_cut_mod,freeze_frames, hop_count, freeze_buffer_mod);
+        [flog_cut_mod,walk_index_mod,walk_direction_mod] = handle_freeze_walk(flog_cut_env,freeze_frames,hop_count,walk_index_mod,walk_direction_mod,freeze_buffer_mod);
+    end
+
+    % Convert back to linear frequency (these values will only be used if
+    % whitening is off)
+    f_env_out_y = exp(flog_cut_env);
     f_env_out_z = exp(flog_cut_mod);
 
+
     % Compute lfo value at current frame
-     lfoVal = (1 + sin(2*pi*Ts*pin*lfoFreq)) / 2;
+    lfoVal = (1 + sin(2*pi*Ts*pin*lfoFreq)) / 2;
 
     if whitening
         % Compute cepstrum for the source
@@ -131,6 +177,7 @@ while pin<pend
         % Morph between whitened envelopes
         f_combined_env = f_env_out_y * lfoVal + f_env_out_z * (1-lfoVal);
     else
+        % Morph between non whitened envelopes
         f_combined_env = f_env_out_y * lfoVal + f_env_out_z * (1-lfoVal);
     end
 
@@ -147,9 +194,6 @@ while pin<pend
         grain = (real(ifft(f_sou.*f_env_out_y))).*w2;
     end 
 
-    
-    
-
     % Overlap-add the output
     DAFx_out(pin+1:pin+s_win) = DAFx_out(pin+1:pin+s_win) + grain;
 
@@ -158,7 +202,10 @@ while pin<pend
 
     % Update hop count
     hop_count = hop_count + 1;
-    disp(hop_count);
+    
+    % Shift delay vector
+    s_delay_vector = circshift(s_delay_vector, 1);
+
 end 
 
     % Trim and normalize the output
