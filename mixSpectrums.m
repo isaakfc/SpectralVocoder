@@ -1,4 +1,4 @@
-function c = mixArrays(y, z, percentage)
+function c = mixSpectrums(y, z, percentage)
     % Ensure percentage is within bounds
     if percentage < 0 || percentage > 100
         error('Percentage must be between 0 and 100.')

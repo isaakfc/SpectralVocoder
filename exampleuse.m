@@ -15,6 +15,6 @@ z = audioread('VocalSound2.wav'); % Sound for spectral envelope modulator
 % spectralDelay  - 1 or 0 Employs a spectral delay for the spectral
 % envelope
 
-[out] = spectralVocoder2(x, y, z, Fs, 'Rectangular', 1, 0, 1, 0, 0);
+[out] = spectralVocoder2(x, y, z, Fs, 'Rectangular', 0, 0, 1, 1, 0);
 
 audiowrite('CrossCepstrum.wav', out, Fs);

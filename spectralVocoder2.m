@@ -22,11 +22,12 @@ y = y(:,1);
 z = z(:,1);
 
 % Parameters
-s_win = 1024;   % Window size
-n1 = 256;       % Step increment
-order_que = 30; % Cut quefrency for sound 1
-r = 0.99;       % Normalizing ratio for sound output
-lfoFreq = 0.5;  % Lfo frequency for morphing 
+s_win = 1024;     % Window size
+n1 = 256;         % Step increment
+order_que = 30;   % Cut quefrency for sound 1
+r = 0.99;         % Normalizing ratio for sound output
+lfoFreq = 0.5;    % Lfo frequency for morphing 
+morphingMode = 0; % Initialise morphing mode
     
 % Initializations
 w1 = hanning(s_win, 'periodic'); % Analysis window
@@ -64,33 +65,30 @@ walk_direction_mod = 1;
 % Index for counting number of frames 
 hop_count = 1;
 
-% For freeze effect 
-freeze_buffer = zeros(1024,freeze_frames);
-freeze_buffer_mod = zeros(1024,freeze_frames);
-
 % Create delay vector for spectral delay
 max_delay = 200;
-s_delay_vector = round(linspace(0, max_delay, s_win));
+s_delay_vector = round(linspace(0, max_delay, s_win/2 - 1));
+
+out2 = s_delay_vector;
 
 % Create buffers for spectral delay
 delay_buffer = zeros(s_win,max_delay);
 delay_buffer_mod = zeros(s_win,max_delay);
 
-mixAmount = 100;
-morphingMode = 0;
 
 % Set morphing mode if selected
-if morphingOn ~= 0
-
-    mode = input('Select morphing mode, 1 for frequency morphing or 2 for magnitude morphing');
-    if mode == 1
-        morphingMode = 1;
-    elseif mode == 2
-        morphingMode = 2;
-    else
-        error('INVALID INPUT');
-    end
+if morphingOn
+     [morphingMode, lfoFreq] = handleMorphingOptions(morphingMode, lfoFreq);
 end
+
+% Set number of freeze frames if on
+if spectralFreeze
+    freeze_frames = handleFreezeOptions(freeze_frames);
+end
+
+% For freeze effect 
+freeze_buffer = zeros(1024,freeze_frames);
+freeze_buffer_mod = zeros(1024,freeze_frames);
 
 % Cross synthesis
 while pin<pend
@@ -147,33 +145,28 @@ while pin<pend
 
     if spectralDelay
         delay_buffer = circularBufferWrite(flog_cut_env,delay_buffer,hop_count);
-        flog_cut_env = processSpectralDelay(flog_cut_env,delay_buffer,hop_count,s_delay_vector);
+        flog_cut_env = processSpectralDelay2(flog_cut_env,delay_buffer,hop_count,s_delay_vector);
         delay_buffer_mod = circularBufferWrite(flog_cut_mod,delay_buffer_mod,hop_count);
-        flog_cut_mod = processSpectralDelay(flog_cut_mod,delay_buffer_mod,hop_count,s_delay_vector);
+        flog_cut_mod = processSpectralDelay2(flog_cut_mod,delay_buffer_mod,hop_count,s_delay_vector);
     end
 
     % Add spectral envelopes to buffer if freeze is on and not past number
     % of freeze frames
     if spectralFreeze
-        freeze_buffer = handle_freeze_storage(flog_cut_env,freeze_frames, hop_count, freeze_buffer);
-        [flog_cut_env,walk_index,walk_direction] = handle_freeze_walk(flog_cut_env,freeze_frames,hop_count,walk_index,walk_direction,freeze_buffer);
-        freeze_buffer_mod = handle_freeze_storage(flog_cut_mod,freeze_frames, hop_count, freeze_buffer_mod);
-        [flog_cut_mod,walk_index_mod,walk_direction_mod] = handle_freeze_walk(flog_cut_env,freeze_frames,hop_count,walk_index_mod,walk_direction_mod,freeze_buffer_mod);
+        freeze_buffer = handleFreezeStorage(flog_cut_env,freeze_frames, hop_count, freeze_buffer);
+        [flog_cut_env,walk_index,walk_direction] = handleFreezeWalk(flog_cut_env,freeze_frames,hop_count,walk_index,walk_direction,freeze_buffer);
+        freeze_buffer_mod = handleFreezeStorage(flog_cut_mod,freeze_frames, hop_count, freeze_buffer_mod);
+        [flog_cut_mod,walk_index_mod,walk_direction_mod] = handleFreezeWalk(flog_cut_env,freeze_frames,hop_count,walk_index_mod,walk_direction_mod,freeze_buffer_mod);
+    end
+
+    if morphingMode == 1
+        flog_cut_env = mixSpectrums(flog_cut_env,flog_cut_mod,lfoVal*100);
     end
 
     % Convert back to linear frequency (these values will only be used if
     % whitening is off)
     f_env_out_y = exp(flog_cut_env);
     f_env_out_z = exp(flog_cut_mod);
-
-    
-
-    
-
-    if morphingMode == 1
-        flog_cut_env = mixArrays(flog_cut_env,flog_cut_mod,mixAmount);
-        out2 = flog_cut_env;
-    end
 
     if whitening
         % Compute cepstrum for the source
@@ -222,7 +215,7 @@ end
 
     % Trim and normalize the output
     DAFx_out = DAFx_out(s_win+1:length(DAFx_out)) / max(abs(DAFx_out));
-    sound(DAFx_out, Fs); 
+    %sound(DAFx_out, Fs); 
 
     % Normalize for wav output and write to file
     out = r * DAFx_out/max(abs(DAFx_out)); 

@@ -1,4 +1,4 @@
-function [out,walk_index,walk_direction] = handle_freeze_walk(spectral_envelope, freeze_frames, hop_count, walk_index, walk_direction, freeze_buffer)
+function [out,walk_index,walk_direction] = handleFreezeWalk(spectral_envelope, freeze_frames, hop_count, walk_index, walk_direction, freeze_buffer)
 
     
     if hop_count <= freeze_frames
