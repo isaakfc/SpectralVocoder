@@ -11,7 +11,7 @@
 % spectralDelay  - 1 or 0 Employs a spectral delay for the spectral
 % envelope
 
-function [out] = spectralVocoder2(x, y, z, Fs, lifteringType, morphingOn, phaseTransfer, whitening, spectralFreeze, spectralDelay)
+function [out,out2] = spectralVocoder2(x, y, z, Fs, lifteringType, morphingOn, phaseTransfer, whitening, spectralFreeze, spectralDelay)
 
 % Get sampling period
 Ts = 1/Fs;
@@ -76,8 +76,11 @@ s_delay_vector = round(linspace(0, max_delay, s_win));
 delay_buffer = zeros(s_win,max_delay);
 delay_buffer_mod = zeros(s_win,max_delay);
 
+mixAmount = 100;
+morphingMode = 0;
+
 % Set morphing mode if selected
-if morphing ~= 0
+if morphingOn ~= 0
 
     mode = input('Select morphing mode, 1 for frequency morphing or 2 for magnitude morphing');
     if mode == 1
@@ -91,6 +94,10 @@ end
 
 % Cross synthesis
 while pin<pend
+    
+    % Compute lfo value at current frame
+    lfoVal = (1 + sin(2*pi*Ts*pin*lfoFreq)) / 2;
+
     % Window the grains of source and envelope
     grain_sou = x(pin+1:pin+s_win).* w1;
     grain_env = y(pin+1:pin+s_win).* w1;
@@ -159,9 +166,14 @@ while pin<pend
     f_env_out_y = exp(flog_cut_env);
     f_env_out_z = exp(flog_cut_mod);
 
+    
 
-    % Compute lfo value at current frame
-    lfoVal = (1 + sin(2*pi*Ts*pin*lfoFreq)) / 2;
+    
+
+    if morphingMode == 1
+        flog_cut_env = mixArrays(flog_cut_env,flog_cut_mod,mixAmount);
+        out2 = flog_cut_env;
+    end
 
     if whitening
         % Compute cepstrum for the source
@@ -186,7 +198,7 @@ while pin<pend
         f_env_out_y    = abs(f_env_out_y).*exp(j*phase_mod);
     end
 
-    if morphingOn
+    if morphingMode == 2
         % ifft of morphed envelope with source
         grain = (real(ifft(f_sou.*f_combined_env))).*w2;
     else
