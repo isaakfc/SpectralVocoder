@@ -5,14 +5,13 @@
 % lifteringType  - 'Rectangular' or 'Exponential' or 'Linear'
 % morphingOn     - 1 or 0 depending if you want the sound to morph between y
 % and z
-% phaseTransfer  - Gives options for phase effects
-% whitening      - Whitens the source sound
-% spectralFreeze - 1 or 0 Freezes a selectable amount of frames from
-% beginning
+% phaseEffect    - 1 or 0 Offers a choice of 3 phase effects
+% whitening      - 1 or 0 Whitens the source sound
+% spectralFreeze - 1 or 0 Takes an average of the spectral envelope
 % spectralDelay  - 1 or 0 Employs a spectral delay for the spectral
 % envelope
 
-function [out] = spectralVocoder2(x, y, z, Fs, lifteringType, morphingOn, phaseEffect, whitening, spectralFreeze, spectralDelay)
+function [out] = spectralVocoderPlotter(x, y, z, Fs, lifteringType, morphingOn, phaseEffect, whitening, spectralFreeze, spectralDelay)
 
 % Get sampling period
 Ts = 1/Fs;
@@ -24,37 +23,37 @@ z = z(:,1);
 
 % Parameters
 s_win = 1024;     % Window size
-n1 = 256;         % Hop size
-order_que = 30;   % Quefrency cut
-r = 0.99;         % Ratio for normalising
+n1 = 256;         % Step increment
+order_que = 30;   % Cut quefrency for sound 1
+r = 0.99;         % Normalizing ratio for sound output
 lfoFreq = 0.5;    % Lfo frequency for morphing 
 morphingMode = 0; % Initialise morphing mode
 phase_mode = 0;   % Initialise phase mode
 lfoType = 1;      % Initialise LFO type
     
-% Set conditions for FFT loop
-w1 = hanning(s_win, 'periodic'); % Hanning analysis window
-w2 = w1; % Synthesis window that is the same as analysis
-hs_win = s_win/2; 
+% Initializations
+w1 = hanning(s_win, 'periodic'); % Analysis window
+w2 = w1; % Synthesis window
+hs_win = s_win/2; % Half window size
 
-% Initialising buffers
-grain_sou = zeros(s_win,1); 
-grain_env = zeros(s_win,1); 
-grain_mod = zeros(s_win,1); 
+% Buffers for audio data
+grain_sou = zeros(s_win,1); % Grain for source extraction
+grain_env = zeros(s_win,1); % Grain for envelope extraction
+grain_mod = zeros(s_win,1); % Grain for envelope modulator extraction
 
-% Initialise for indexing through loop
+% Start and end index
 pin = 0; 
 L = min(length(x),length(y));
 L = min(length(z),L);
 pend = L - s_win; 
 
-% Zero pad and normalise
+% Normalize audio data and zero pad
 x = [zeros(s_win, 1); x; zeros(s_win-mod(L,n1),1)] / max(abs(x));
 y = [zeros(s_win, 1); y; zeros(s_win-mod(L,n1),1)] / max(abs(y));
 z = [zeros(s_win, 1); z; zeros(s_win-mod(L,n1),1)] / max(abs(z));
 
 % Output audio buffer
-vox_out = zeros(L,1);
+DAFx_out = zeros(L,1);
 
 % Set spectral freeze size
 freeze_frames = 25;
@@ -112,12 +111,24 @@ while pin<pend
         lfoVal = (1 + sawtooth(2*pi*Ts*pin*lfoFreq)) / 2;
     end
 
-
-
     % Window the grains of source and envelope
     grain_sou = x(pin+1:pin+s_win).* w1;
     grain_env = y(pin+1:pin+s_win).* w1;
     grain_mod = z(pin+1:pin+s_win).* w1;
+
+    %{
+
+    if pin == n1*500
+        plot(grain_env);
+        xlabel('Samples');
+        ylabel('Amplitude');
+        title('Windowed Grain', 'FontSize', 20);
+        xlim([0 1024]);
+        
+    end
+
+    %}
+
 
     % Take Fourier transform of source and envelope
     f_sou = fft(grain_sou);
@@ -129,9 +140,40 @@ while pin<pend
 
     % Compute the cepstrum of the spectral envelope
     flog = log(0.00001+abs(f_env));
+
+    %{
+
+    if pin == n1*500
+        f = (0:s_win/2-1)*(Fs/s_win);
+
+        plot(f, flog(1:s_win/2));
+        xlabel('Frequency (Hz)');
+        ylabel('Log Amplitude');
+        title('Log Frequency Spectrum', 'FontSize', 20);
+        xlim([0 22000]);
+        
+    end
+    
+    %}
+    
+
     cep = ifft(flog);
     flog_mod = log(0.00001+abs(f_mod));
     cep_mod = ifft(flog_mod);
+
+    %{
+
+    if pin == n1*500
+        plot(cep);
+        xlabel('Quefrency');
+        ylabel('Cepstral Amplitude');
+        title('Cepstrum', 'FontSize', 20);
+        xlim([0 1024]);
+        ylim([-1 1]);
+        
+    end
+
+    %}
 
     if strcmp(lifteringType, 'Rectangular')
         % Liftering to reduce the cepstral order
@@ -159,11 +201,42 @@ while pin<pend
           cep_cut_mod = cep_mod.*cep_lifter';
           cep_cut_mod(1:1) = cep_mod(1)/2;
     end
+
+    
+    %{
+    if pin == n1*500
+        plot(cep_cut);
+        xlabel('Quefrency');
+        ylabel('Cepstral Amplitude');
+        title('Cepstrum After Exponential Liftering', 'FontSize', 20);
+        xlim([0 1024]);
+        ylim([-1 1]);
+        
+    end
+
+    %}
+
+    
     
     % Inverse FFT to get the spectral envelope of y
     flog_cut_env = 2*real(fft(cep_cut));
     % Inverse FFT to get the spectral envelope of z
     flog_cut_mod = 2*real(fft(cep_cut_mod));
+
+    %{
+
+    if pin == n1*500
+        f = (0:s_win/2-1)*(Fs/s_win);
+        figure();
+        plot(f, flog_cut_env(1:s_win/2));
+        xlabel('Frequency (Hz)');
+        ylabel('Log Amplitude');
+        title('Frequency Morphed Envelope', 'FontSize', 20);
+        xlim([0 22000]);
+        
+    end
+    
+    %}
 
     if spectralDelay
         delay_buffer = circularBufferWrite(flog_cut_env,delay_buffer,hop_count);
@@ -182,7 +255,19 @@ while pin<pend
     end
 
     if morphingMode == 1
-        flog_cut_env = mixSpectrums(flog_cut_env,flog_cut_mod,lfoVal*100);
+        flog_cut_env = mixSpectrums(flog_cut_env,flog_cut_mod,50);
+    end
+
+
+    if pin == n1*500
+        f = (0:s_win/2-1)*(Fs/s_win);
+        figure();
+        plot(f, flog_cut_env(1:s_win/2));
+        xlabel('Frequency (Hz)');
+        ylabel('Log Amplitude');
+        title('Frequency Morphed Envelope', 'FontSize', 20);
+        xlim([0 22000]);
+        
     end
 
     % Convert back to linear frequency (these values will only be used if
@@ -233,7 +318,7 @@ while pin<pend
     end 
 
     % Overlap-add the output
-    vox_out(pin+1:pin+s_win) = vox_out(pin+1:pin+s_win) + grain;
+    DAFx_out(pin+1:pin+s_win) = DAFx_out(pin+1:pin+s_win) + grain;
 
     % Move to the next frame
     pin = pin + n1;
@@ -247,10 +332,10 @@ while pin<pend
 end 
 
     % Trim and normalize the output
-    vox_out = vox_out(s_win+1:length(vox_out)) / max(abs(vox_out));
-    sound(vox_out, Fs); 
+    DAFx_out = DAFx_out(s_win+1:length(DAFx_out)) / max(abs(DAFx_out));
+    %sound(DAFx_out, Fs); 
 
     % Normalize for wav output and write to file
-    out = r * vox_out/max(abs(vox_out)); 
+    out = r * DAFx_out/max(abs(DAFx_out)); 
     
 end

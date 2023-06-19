@@ -9,12 +9,13 @@ z = audioread('VocalSound2.wav'); % Sound for spectral envelope modulator
 % lifteringType  - 'Rectangular' or 'Exponential' or 'Linear'
 % morphingOn     - 1 or 0 depending if you want the sound to morph between y
 % and z
-% phaseTransfer  - transfers the phase of the modulator into y
+% phaseTransfer  - Gives options for phase effects
 % whitening      - Whitens the source sound
-% spectralFreeze - 1 or 0 Takes an average of the spectral envelope
+% spectralFreeze - 1 or 0 Freezes a selectable amount of frames from
+% beginning
 % spectralDelay  - 1 or 0 Employs a spectral delay for the spectral
 % envelope
 
-[out] = spectralVocoder2(x, y, z, Fs, 'Rectangular', 0, 0, 1, 1, 0);
+[out] = spectralVocoder2(x, y, z, Fs, 'Rectangular', 0, 0, 1, 0, 0);
+%[out] = spectralVocoderPlotter(x, z, y, Fs, 'Rectangular', 0, 0, 1, 0, 0);
 
-audiowrite('CrossCepstrum.wav', out, Fs);

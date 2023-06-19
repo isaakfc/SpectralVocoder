@@ -90,13 +90,17 @@ while pin<pend
          cep_lifter = exp(-(0:s_win-1)/s_win); 
          % Apply cut 
          cep_cut = cep.*cep_lifter';
+         cep_cut(1:1) = cep(1)/2;
          cep_cut_mod = cep_mod.*cep_lifter';
+         cep_cut_mod(1:1) = cep_mod(1)/2;
 
     else
           %Linear liftering
           cep_lifter = (0:s_win-1)/s_win;
           cep_cut = cep.*cep_lifter';
+          cep_cut(1:1) = cep(1)/2;
           cep_cut_mod = cep_mod.*cep_lifter';
+          cep_cut_mod(1:1) = cep_mod(1)/2;
     end
     
     % Inverse FFT to get the spectral envelope
