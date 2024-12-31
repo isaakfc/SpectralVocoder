@@ -17,5 +17,5 @@ z = audioread('VocalSound2.wav'); % Sound for spectral envelope modulator
 % envelope
 
 [out] = spectralVocoder2(x, y, z, Fs, 'Rectangular', 0, 0, 1, 0, 0);
-%[out] = spectralVocoderPlotter(x, z, y, Fs, 'Rectangular', 0, 0, 1, 0, 0);
+
 

@@ -8,7 +8,7 @@ function [out,walk_index,walk_direction] = handleFreezeWalk(spectral_envelope, f
         walk_index = walk_index + walk_direction;
         if walk_index == freeze_frames
             walk_direction = -1;
-        % If we've reached the start of the buffer, change direction
+        % If at start of buffer then switch directions
         elseif walk_index == 1
             walk_direction = 1;
         end

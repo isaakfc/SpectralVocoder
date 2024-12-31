@@ -9,16 +9,15 @@ function c = mixSpectrums(y, z, percentage)
     % Get the middle of the arrays in regards to nyquist
     mid = len/2 + 1;  
 
-    % Calculate how many elements we want from the first halfs of signal a
-    % and b
-    nA = round((1 - percentage / 100) * (mid - 2));  % -1 to exclude the Nyquist component
-    nB = (mid - 2) - nA;  % -1 to exclude the Nyquist component
+    % Calculate amount of elements we want for a and b
+    A = round((1 - percentage / 100) * (mid - 2));  
+    B = (mid - 2) - A;  
 
     % Create first half of c
-    c_first_half = [y(2:2+nA-1); z(nA+2:nA+2+nB-1)];  % Take Nyquist component from b
+    c_first_half = [y(2:2+A-1); z(A+2:A+2+B-1)]; 
 
-    % Create second half of c as the flip of the first half, excluding DC and Nyquist
-    c_second_half = flipud(c_first_half);  % Exclude DC and Nyquist when flipping
+    % Create second half of c as the flip of the first half
+    c_second_half = flipud(c_first_half);  
 
     % Just use dc of 1st signal, combine with first half, DC of second
     % (will be the same for both anyway) and the flipped second half
@@ -26,7 +25,7 @@ function c = mixSpectrums(y, z, percentage)
 
 
     % If selection is 100% just use b to avoid errors
-     if nA == 0
+     if A == 0
          c = z;
      end
 

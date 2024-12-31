@@ -114,12 +114,12 @@ while pin<pend
 
 
 
-    % Window the grains of source and envelope
+    % Window the grains for all inputs
     grain_sou = x(pin+1:pin+s_win).* w1;
     grain_env = y(pin+1:pin+s_win).* w1;
     grain_mod = z(pin+1:pin+s_win).* w1;
 
-    % Take Fourier transform of source and envelope
+    % Take FFT's
     f_sou = fft(grain_sou);
     f_env = fft(grain_env)/hs_win;
     f_mod = fft(grain_mod)/hs_win;
@@ -127,16 +127,15 @@ while pin<pend
     % Hold phase information for later
     phase_mod = angle(f_mod);
 
-    % Compute the cepstrum of the spectral envelope
+    % Compute cepstrum
     flog = log(0.00001+abs(f_env));
     cep = ifft(flog);
     flog_mod = log(0.00001+abs(f_mod));
     cep_mod = ifft(flog_mod);
 
     if strcmp(lifteringType, 'Rectangular')
-        % Liftering to reduce the cepstral order
-        cep_cut = zeros(s_win,1);
         % Rectangular liftering
+        cep_cut = zeros(s_win,1);
         cep_cut(1:order_que) = [cep(1)/2; cep(2:order_que)];
         % Same for modulator
         cep_cut_mod = zeros(s_win,1);
@@ -192,16 +191,13 @@ while pin<pend
 
     if whitening
         % Compute cepstrum for the source
-        flog_sou = log(0.00001+abs(f_sou));  % Log of the absolute value of the source FFT
-        cep_sou = ifft(flog_sou);  % Inverse FFT of log of source (cepstrum of source)
+        flog_sou = log(0.00001+abs(f_sou));  
+        cep_sou = ifft(flog_sou);  
         cep_cut_sou = zeros(s_win,1);  
-        cep_cut_sou(1:order_que) = [cep_sou(1)/2; cep_sou(2:order_que)];  % Cut and weight the source cepstrum
-        flog_cut_sou = 2*real(fft(cep_cut_sou));  % FFT of the cut source cepstrum 
-        % Here, the spectral envelope is computed by subtracting the cut source cepstrum from the cut envelope cepstrum
-        % This operation whitens the source by removing its spectral envelope, and then applies the envelope of the filter
+        cep_cut_sou(1:order_que) = [cep_sou(1)/2; cep_sou(2:order_que)];  
+        flog_cut_sou = 2*real(fft(cep_cut_sou));  
         f_env_out_y = exp(flog_cut_env - flog_cut_sou);  % Whitening with source for y
         f_env_out_z = exp(flog_cut_mod - flog_cut_sou);  % Whitening with source for z
-        % Morph between whitened envelopes
         f_combined_env = f_env_out_y * lfoVal + f_env_out_z * (1-lfoVal);
     else
         % Morph between non whitened envelopes
@@ -232,10 +228,10 @@ while pin<pend
         grain = (real(ifft(f_sou.*f_env_out_y))).*w2;
     end 
 
-    % Overlap-add the output
+    % overlapp-add
     vox_out(pin+1:pin+s_win) = vox_out(pin+1:pin+s_win) + grain;
 
-    % Move to the next frame
+    % Move by hops size
     pin = pin + n1;
 
     % Update hop count
@@ -246,11 +242,11 @@ while pin<pend
 
 end 
 
-    % Trim and normalize the output
+    % Normalise the output and trim
     vox_out = vox_out(s_win+1:length(vox_out)) / max(abs(vox_out));
     sound(vox_out, Fs); 
 
-    % Normalize for wav output and write to file
+    % Write and normalise 
     out = r * vox_out/max(abs(vox_out)); 
     
 end
